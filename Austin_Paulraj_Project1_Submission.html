@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Project 1: Block Tree</title>
+
+  <!-- Styles used in displaying correct shapes, sizes and colers-->
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #050510;
+      color: white;
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    
+    canvas {
+      display: block;
+      background: #050510;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    /* Used in Scene 0 and Scene 1 */
+    canvas.fullscreen {
+      position: absolute;
+      top: 0; 
+      left: 0;
+      width: 100vw; 
+      height: 100vh;
+      transform: none !important;
+    }
+
+    /* Used in Scene 2 and Scene 3 */
+    canvas.fixed-res {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform-origin: center center;
+    }
+
+    /* Scene visibility controls */
+    .scene { 
+      display: none; 
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      padding: 12px 14px;
+      background: rgba(0, 0, 0, 0.8);
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.4;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .active { 
+      display: block; 
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <!-- Define Scene headings with Title, Name and Directions for use -->
+  <!-- Base Scene (Default) -->
+  <div id="scene-base" class="scene active">
+    <h2>Project 1: Block Tree | Austin Paulraj</h2>
+    <h3>Base Scene</h3>
+    <p>Arrow keys to move camera, R to reset camera</p>
+    <p>0 key - Level 0: Base Scene</p>
+    <p>1 key - Level 1: Wire-frame, pinhole camera</p>
+    <p>2 key - Level 2: Lower resolution, line drawing</p>
+    <p>3 key - Level 3: Triangles and triangle fill</p>
+  </div>
+
+  <!-- Scene 1 -->
+  <div id="scene-1" class="scene">
+    <h2>Project 1: Block Tree | Austin Paulraj</h2>
+    <h3>Level 1: Wire-frame, pinhole camera</h3>
+    <p>Arrow keys to move camera, R to reset camera</p>
+    <p>0 key - Level 0: Project preliminaries</p>
+    <p>1 key - Level 1: Wire-frame, pinhole camera</p>
+    <p>2 key - Level 2: Lower resolution, line drawing</p>
+    <p>3 key - Level 3: Triangles and triangle fill</p>
+  </div>
+
+  <!-- Scene 2 -->
+  <div id="scene-2" class="scene">
+    <h2>Project 1: Block Tree | Austin Paulraj</h2>
+    <h3>Level 2: Lower resolution, line drawing</h3>
+    <p>Arrow keys to move camera, R to reset camera</p>
+    <p>0 key - Level 0: Project preliminaries</p>
+    <p>1 key - Level 1: Wire-frame, pinhole camera</p>
+    <p>2 key - Level 2: Lower resolution, line drawing</p>
+    <p>3 key - Level 3: Triangles and triangle fill</p>
+  </div>
+
+  <!-- Scene 3 -->
+  <div id="scene-3" class="scene">
+    <h2>Project 1: Block Tree | Austin Paulraj</h2>
+    <h3>Level 3: Triangles and triangle fill</h3>
+    <p>Arrow keys to move camera, R to reset camera</p>
+    <p>0 key - Level 0: Project preliminaries</p>
+    <p>1 key - Level 1: Wire-frame, pinhole camera</p>
+    <p>2 key - Level 2: Lower resolution, line drawing</p>
+    <p>3 key - Level 3: Triangles and triangle fill</p>
+  </div>
+
+<script>
+  // Define all base variables for further working through levels
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+
+  const LOW_RES_WIDTH = 320;
+  const LOW_RES_HEIGHT = 200;
+  const PIXEL_SCALE = 8;
+  const R = 0.4;
+  const y_base = -3;
+
+  // Standard Cube / Block Mesh used for "Level 0"
+  const cubeVertices = [
+    { x: -0.5, y: -0.5, z: -0.5 }, { x:  0.5, y: -0.5, z: -0.5 },
+    { x:  0.5, y:  0.5, z: -0.5 }, { x: -0.5, y:  0.5, z: -0.5 },
+    { x: -0.5, y: -0.5, z:  0.5 }, { x:  0.5, y: -0.5, z:  0.5 },
+    { x:  0.5, y:  0.5, z:  0.5 }, { x: -0.5, y:  0.5, z:  0.5 }
+  ];
+  const cubeEdges = [
+    [0, 1], [1, 2], [2, 3], [3, 0],
+    [4, 5], [5, 6], [6, 7], [7, 4],
+    [0, 4], [1, 5], [2, 6], [3, 7]
+  ];
+  const cubeTris = [
+    [0, 1, 2], [0, 2, 3], [5, 4, 7], [5, 7, 6],
+    [4, 0, 3], [4, 3, 7], [1, 5, 6], [1, 6, 2],
+    [4, 5, 1], [4, 1, 0], [3, 2, 6], [3, 6, 7]
+  ];
+  //Definition of the meshes that eventually form the Tree Scene
+  // We use the same Cube mesh definitions for hte Tree leaves and scale them when instancing
+  const blockVertices = cubeVertices, blockEdges = cubeEdges, blockTris = cubeTris;
+
+  // Floor Rect Mesh - Represent square patch of grass as base of the scene
+  const floorVertices = [
+    { x: -0.5, y: 0, z: -0.5 }, { x:  0.5, y: 0, z: -0.5 },
+    { x:  0.5, y: 0, z:  0.5 }, { x: -0.5, y: 0, z:  0.5 }
+  ];
+  const floorEdges = [[0, 1], [1, 2], [2, 3], [3, 0]];
+  const floorTris = [[0, 1, 2], [0, 2, 3]];
+
+  // Pyramid Mesh - Represnet small bushes
+  const pyramidVertices = [
+    { x:  0.5, y: -0.5, z:  0.5 }, { x: -0.5, y: -0.5, z:  0.5 },
+    { x: -0.5, y: -0.5, z: -0.5 }, { x:  0.5, y: -0.5, z: -0.5 },
+    { x:  0.0, y:  0.5, z:  0.0 }
+  ];
+  const pyramidEdges = [
+    [0, 1], [1, 2], [2, 3], [3, 0],
+    [0, 4], [1, 4], [2, 4], [3, 4]
+  ];
+  const pyramidTris = [
+    [0, 1, 2], [0, 2, 3], [0, 1, 4],
+    [1, 2, 4], [2, 3, 4], [3, 0, 4]
+  ];
+
+  // Positions of Bushes/Pyramids in scene around Tree
+  const bushSpots = [
+    { x: -2.4 * R, z: -5.2 * R },
+    { x:  2.6 * R, z: -4.0 * R },
+    { x: -2.8 * R, z:  2.8 * R },
+    { x:  2.3 * R, z:  5.5 * R }
+  ];
+
+  // Colors of the Tree, Floor and Bushes
+  const COLOR = {
+    trunk: "#8B5A2B",
+    leaves: "#2FA84F",
+    floor: "#2FA84F",
+    bush: "#2A9A88"
+  };
+
+  // Intialise camera position, current scene and scene array
+  let camera = {x: 0, y: 0, z: -10};
+  let currentScene = 'scene-base';
+  let scene = [];
+
+  // Define the pixel grid and z-buffer for Levels 2 and 3 implementation
+  const cols = LOW_RES_WIDTH;
+  const rows = LOW_RES_HEIGHT;
+  const pixelGrid = Array.from({ length: cols }, () => Array(rows).fill("#050510"));
+  let seePixelOutline = true;
+
+  // Global Z-Buffer
+  let zBuffer = Array.from({ length: cols }, () => Array(rows).fill(Infinity));
+
+  // Functions MakeInstance and BuildScene are use to Instanciate Place and Scale the meshes that make up the Tree Scene
+  function makeInstance(type, pos, scale, color) {
+    let vertices, edges, triangles;
+    if (type === "cuboid") {
+      vertices = cubeVertices; edges = cubeEdges; triangles = cubeTris;
+    } else if (type === "floorRect") {
+      vertices = floorVertices; edges = floorEdges; triangles = floorTris;
+    } else if (type === "block") {
+      vertices = blockVertices; edges = blockEdges; triangles = blockTris;
+    } else {
+      vertices = pyramidVertices; edges = pyramidEdges; triangles = pyramidTris;
+    }
+    return { type, pos, scale, color, vertices, edges, triangles };
+  }
+
+  function buildScene() {
+    const newScene = [];
+    if (currentScene !== 'scene-base') {
+      newScene.push(makeInstance(
+        "floorRect",
+        { x: 0, y: y_base, z: 0 },
+        //We scale all values by a factor of "R" (A variable defined above) to allow fine control of scene size and camera coverage
+        { x: 7 * R, y: 1, z: 14 * R },
+        COLOR.floor
+      ));
+      newScene.push(makeInstance(
+        "cuboid",
+        { x: 0, y: 5 * R + y_base, z: 0 },
+        { x: 2 * R, y: 10 * R, z: 2 * R },
+        COLOR.trunk
+      ));
+      newScene.push(makeInstance(
+        "cuboid",
+        { x: 0, y: 11.5 * R + y_base, z: 0 },
+        { x: 6 * R, y: 3 * R, z: 6 * R },
+        COLOR.leaves
+      ));
+      newScene.push(makeInstance(
+        "cuboid",
+        { x: 0, y: 14 * R + y_base, z: 0 },
+        { x: 4 * R, y: 2 * R, z: 4 * R },
+        COLOR.leaves
+      ));
+      newScene.push(makeInstance(
+        "cuboid",
+        { x: 0, y: 15.5 * R + y_base, z: 0 },
+        { x: 2 * R, y: 1 * R, z: 2 * R },
+        COLOR.leaves
+      ));
+      for (let i = 0; i < bushSpots.length; i++) {
+        newScene.push(makeInstance(
+          "pyramid",
+          { x: bushSpots[i].x, y: 1 * R + y_base, z: bushSpots[i].z },
+          { x: 1 * R, y: 2 * R, z: 1 * R },
+          COLOR.bush
+        ));
+      }
+    } else {
+      newScene.push(makeInstance(
+        "block",
+        { x: 0, y: 0, z: 0 },
+        { x: 2, y: 2, z: 2 },
+        "white"
+      ));
+    }
+    return newScene;
+  }
+  
+  // Function showScene is used to switch between scenes
+  function showScene(sceneId) {
+    currentScene = sceneId; 
+    const scenes = document.querySelectorAll('.scene');
+    scenes.forEach(s => s.classList.remove('active'));
+
+    const target = document.getElementById(sceneId);
+    if (target) {
+      target.classList.add('active');
+    }
+    updateCanvasDimensions();
+    scene = buildScene();
+    draw();    
+  }
+
+  //This function is mainly called when switching between canvases and updates the Canvas Dimensions between 1600x900 and the pseudo 320x200
+  function updateCanvasDimensions() {
+    if (currentScene === 'scene-base' || currentScene === 'scene-1') {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      canvas.className = "fullscreen";
+      canvas.style.transform = "none";
+    } else if (currentScene === 'scene-2' || currentScene === 'scene-3') {
+      canvas.width = LOW_RES_WIDTH;
+      canvas.height = LOW_RES_HEIGHT;
+      canvas.className = "fixed-res";
+
+      const scaleX = window.innerWidth / LOW_RES_WIDTH;
+      const scaleY = window.innerHeight / LOW_RES_HEIGHT;
+      const scale = Math.min(scaleX, scaleY);
+
+      canvas.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    }
+  }
+
+  //drawLine
+  //Base Draw Line function used for level 1 (and 0) to draw lines between vertices
+  //Adapted from 1st week homework excerise and drawing lines to form a cube.
+  //Level 0 is essentiall an exact copy of the homework excersise and then built on top of to include the various functionality required.
+  function drawLine(x1, y1, x2, y2, color) {
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+
+  //clearPixelGrid, renderPixelGrid, setPixelColor and makePixelatedLine
+  //Funcitons used for Level 2 (and 3) to define and draw lines through custom implementation of Bresenham's line algorithm
+  //Adapted from inclass excersises and lecture slides
+  function clearPixelGrid() {
+    for (let u = 0; u < LOW_RES_WIDTH; u++) {
+      for (let v = 0; v < LOW_RES_HEIGHT; v++) {
+        pixelGrid[u][v] = "#050510";
+        zBuffer[u][v] = Infinity;
+      }
+    }
+  }
+
+  function renderPixelGrid() {
+    for (let v = 0; v < LOW_RES_HEIGHT; v++) {
+      for (let u = 0; u < LOW_RES_WIDTH; u++) {
+        if (pixelGrid[u][v] !== "#050510") {
+          ctx.fillStyle = pixelGrid[u][v];
+          ctx.fillRect(u, v, 1, 1);
+        }
+      }
+    }
+  }
+
+  function setPixelColor(u, v, color) {
+    let px = Math.floor(u);
+    let py = Math.floor(v);
+    if (px >= 0 && px < LOW_RES_WIDTH && py >= 0 && py < LOW_RES_HEIGHT) {
+      pixelGrid[px][py] = color;
+    }
+  }
+
+  function makePixelatedLine(x0, y0, x1, y1, color) {
+    x0 = Math.round(x0);
+    y0 = Math.round(y0);
+    x1 = Math.round(x1);
+    y1 = Math.round(y1);
+
+    let dx = Math.abs(x1 - x0);
+    let dy = Math.abs(y1 - y0);
+    let sx = (x0 < x1) ? 1 : -1;
+    let sy = (y0 < y1) ? 1 : -1;
+    let err = dx - dy;
+
+    while (true) {
+      setPixelColor(x0, y0, color);
+
+      if (x0 === x1 && y0 === y1) break;
+      let e2 = 2 * err;
+      if (e2 > -dy) {
+        err -= dy;
+        x0 += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y0 += sy;
+      }
+    }
+  }
+
+  //edge function and drawTriangle
+  //Functions used for level 3 to define the edge of the triangle for barycentric rasterization
+  //Adapted from the provided code article on Barycentric Rasterization
+  //We include an adaptive Z-buffer which checks for occulusion
+  //This occlusion effect is most visible with the back right bush, which becoms occluded by the trunk of the tree when you move the camera
+  function edgeFunction(a, b, c) {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  }
+
+  function drawTriangle(a, b, c, color) {
+    let minX = Math.max(0, Math.floor(Math.min(a.x, b.x, c.x)));
+    let maxX = Math.min(canvas.width - 1, Math.ceil(Math.max(a.x, b.x, c.x)));
+    let minY = Math.max(0, Math.floor(Math.min(a.y, b.y, c.y)));
+    let maxY = Math.min(canvas.height - 1, Math.ceil(Math.max(a.y, b.y, c.y)));
+
+    let area = edgeFunction(a, b, c);
+    if (area === 0) return
+
+    for (let py = minY; py <= maxY; py++) {
+      for (let px = minX; px <= maxX; px++) {
+        let p = { x: px + 0.5, y: py + 0.5 };
+
+        let w0 = edgeFunction(b, c, p);
+        let w1 = edgeFunction(c, a, p);
+        let w2 = edgeFunction(a, b, p);
+
+        if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0)) {
+          let lambda0 = w0 / area;
+          let lambda1 = w1 / area;
+          let lambda2 = w2 / area;
+
+          let interpolatedInvZ = lambda0 * (1 / a.z) + lambda1 * (1 / b.z) + lambda2 * (1 / c.z);
+          let pixelDepth = 1 / interpolatedInvZ;
+
+          //Adaptive Z-Buffer check for occulusion as requested to be implemented in the assignment
+          if (pixelDepth < zBuffer[px][py]) {
+            zBuffer[px][py] = pixelDepth;
+            setPixelColor(px, py, color);
+          }
+        }
+      }
+    }
+  }
+
+  // The main "Drawing" function that adaptivly changes the on screen display based on the current scene. Levels 0,1,2, and 3 act as separate scenes
+  // As we switch scenes the function checks for current scene and changes the displayed scene, by employing the different functions above
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#050510";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (currentScene === 'scene-2' || currentScene === 'scene-3') {
+      clearPixelGrid();
+    }
+
+    for (let s = 0; s < scene.length; s++) {
+      let projectedVertices = [];
+      const obj = scene[s];
+      const in_vertices = obj.vertices;
+      const in_edges = obj.edges;
+      const in_triangles = obj.triangles;
+      const in_color = obj.color;
+
+      for (let v = 0; v < in_vertices.length; v++) {
+        let worldX = in_vertices[v].x * obj.scale.x + obj.pos.x;
+        let worldY = in_vertices[v].y * obj.scale.y + obj.pos.y;
+        let worldZ = in_vertices[v].z * obj.scale.z + obj.pos.z;
+
+        let camVert = {
+          x: worldX - camera.x,
+          y: worldY - camera.y,
+          z: worldZ - camera.z
+        };
+
+        let canvasPos = {
+          u: camVert.x / camVert.z,
+          v: camVert.y / camVert.z,
+          z: camVert.z
+        };
+
+        canvasPos.u = canvasPos.u * canvas.width + canvas.width / 2;
+        canvasPos.v = canvasPos.v * canvas.height + canvas.height / 2;
+
+        projectedVertices.push(canvasPos);
+      }
+
+      // Mode 0 & 1: Native Canvas Wireframe
+      if (currentScene === 'scene-1' || currentScene === 'scene-base') {
+        for (let e = 0; e < in_edges.length; e++) {
+          let e1 = in_edges[e][0];
+          let u1 = projectedVertices[e1].u; 
+          let v1 = canvas.height - projectedVertices[e1].v; 
+
+          let e2 = in_edges[e][1];
+          let u2 = projectedVertices[e2].u;
+          let v2 = canvas.height - projectedVertices[e2].v; 
+
+          drawLine(u1, v1, u2, v2, in_color);
+        }
+      } 
+      // Mode 2: Pixelated Wireframe
+      else if (currentScene === 'scene-2') {
+        for (let e = 0; e < in_edges.length; e++) {
+          let e1 = in_edges[e][0];
+          let u1 = projectedVertices[e1].u; 
+          let v1 = canvas.height - projectedVertices[e1].v; 
+
+          let e2 = in_edges[e][1];
+          let u2 = projectedVertices[e2].u;
+          let v2 = canvas.height - projectedVertices[e2].v; 
+
+          makePixelatedLine(u1, v1, u2, v2, in_color);
+        }
+      } 
+      // Mode 3: Barycentric Triangle Rasterization with Z-Buffer
+      else if (currentScene === 'scene-3') {
+        for (let t = 0; t < in_triangles.length; t++) {
+          let t1 = in_triangles[t][0];
+          let t2 = in_triangles[t][1];
+          let t3 = in_triangles[t][2];
+
+          let p1 = { x: projectedVertices[t1].u, y: canvas.height - projectedVertices[t1].v, z: projectedVertices[t1].z };
+          let p2 = { x: projectedVertices[t2].u, y: canvas.height - projectedVertices[t2].v, z: projectedVertices[t2].z };
+          let p3 = { x: projectedVertices[t3].u, y: canvas.height - projectedVertices[t3].v, z: projectedVertices[t3].z };
+
+          drawTriangle(p1, p2, p3, in_color);
+        }
+      }
+    }
+    //Used to render psuedo 320x200 canvas for levels 2 and 3
+    //Done so that we can use a custom line drawing Function
+    if (currentScene === 'scene-2' || currentScene === 'scene-3') {
+      renderPixelGrid();
+    }
+  }
+
+  //Main central Listner to allow for key controls
+  //Implements switching between levels/scenes and camera movement
+  //R allows you to reset the scene
+  //The up arrow event has a check that says the camera can't move past -5 units from the tree
+  document.addEventListener("keydown", (event) => {
+    switch (event.key) {
+      case "0":
+        showScene('scene-base');
+        break;
+      case "1":
+        showScene('scene-1');
+        break;  
+      case "2":
+        showScene('scene-2');
+        break;
+      case "3":
+        showScene('scene-3');
+        break;
+
+      case "ArrowUp":
+        event.preventDefault();
+        if (camera.z <= -5) {
+          camera.z += 1;
+        }
+        draw();
+        break;
+      case "ArrowDown":
+        event.preventDefault();
+        camera.z += -1;
+        draw();
+        break;
+      case "ArrowLeft":
+        event.preventDefault();
+        camera.x -= 1;
+        draw();
+        break;
+      case "ArrowRight":
+        event.preventDefault();
+        camera.x += 1;
+        draw();
+        break;
+      case "r":
+      case "R":
+        camera = {x: 0, y: 0, z: -10};
+        draw();
+        break;
+    }
+  });
+
+  window.addEventListener("resize", () => {
+    updateCanvasDimensions();
+    draw();
+  });
+
+  // Initial load setup
+  showScene('scene-base');
+</script>
+</body>
+</html>
