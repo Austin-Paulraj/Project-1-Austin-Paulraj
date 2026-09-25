@@ -2,7 +2,8 @@
 
 Austin Paulraj — Submission for Project 1
 Implemented is a Scene of a small patch of grass with pyramids acting as brushes and a blocky tree in the center (Kept very simple and straightforward)
-Link to video presenation - https://youtu.be/-n9841k6pXo
+
+Link to video presentation - https://youtu.be/-n9841k6pXo
 
 The code implemented draws heavily from the given examples in the assignments/example rasterizer articles provided, but adapted to  host the multi-scene setup of the page.
 
